@@ -379,7 +379,7 @@ def send_email(email_body: str,
         except Exception as e:
             print(f"ERROR: Failed to send email using external SMTP server: {e}")
     else:
-        with smtplib.SMTP('localhost') as server:
+        with smtplib.SMTP('127.0.0.1') as server:
             server.sendmail(sender, addressee, msg.as_string())
 
 def send_email_enhanced(email_body: str,
