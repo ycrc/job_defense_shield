@@ -81,7 +81,7 @@ class Alert:
             for user, email, usr in self.emails:
                 if user in self.external_emails:
                     user_email_address = self.external_emails[user]
-                if self.ldap_server:
+                elif self.ldap_server:
                     user_email_address = ldap_email_lookup(user, ldap_server=self.ldap_server, ldap_org=self.ldap_org, ldap_password=self.ldap_password)
                 else:
                     user_email_address = f"{user}{self.email_domain}"
