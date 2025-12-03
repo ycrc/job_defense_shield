@@ -95,6 +95,7 @@ class Alert:
                            smtp_password=self.smtp_password,
                            smtp_port=self.smtp_port,
                            verbose=self.verbose)
+                print(f"Email: {user_email_address}")
                 print(email)
                 if usr is not None:
                     vfile = f"{self.vpath}/{self.violation}/{user}.csv"
@@ -114,6 +115,7 @@ class Alert:
                                    smtp_port=self.smtp_port,
                                    verbose=self.verbose)
                 if self.no_emails_to_users:
+                    print(f"Email: {user_email_address}")
                     print(email)
 
     @abstractmethod
