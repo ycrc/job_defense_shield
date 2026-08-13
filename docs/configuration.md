@@ -340,6 +340,25 @@ The `config.py` file found in the directory specified by `jobstats-config-path` 
 
 To troubleshoot connection issues, use `verbose: True` in the global settings of `config.yaml`.
 
+### (Optional) Apache Druid
+
+Some sites cannot use either of the two storage options above: their Slurm administrators will not allow an external program to write to `slurmdbd` (which rules out `AdminComment`), and they do not run the external MySQL/MariaDB database either. For those sites the Jobstats Kafka producer can write each job's `JS1:` blob into an [Apache Druid](https://druid.apache.org) datasource, and Job Defense Shield can read it back from there:
+
+```yaml
+use-druid: True
+jobstats-config-path: /path/to/jobstats/config/  # config.py
+```
+
+The `config.py` file found in the directory specified by `jobstats-config-path` must define a `DRUID_CONFIG` dictionary providing `url` and `datasource`. An optional `bulk_timeout` (seconds, default 120) bounds each query; it is sent to Druid in the query context as well as being used as the HTTP client timeout, since Druid continues executing a query after the client disconnects.
+
+`use-druid` and `use-external-db` are mutually exclusive.
+
+Note that the `enabled` key of `DRUID_CONFIG` is deliberately **not** consulted. In the Jobstats CLI that flag may be derived from the environment (for example from `$CLUSTER`) to control the single-job read-back. Environment variables are frequently absent under `cron`, so honouring it here would silently disable the backend on exactly the scheduled runs that matter. Use `use-druid` to turn the backend on and off.
+
+The summary statistics are fetched in bulk, one query per day of the requested window, rather than one query per job. The window is padded by a day on each side because Druid rows are timestamped with the job's end time while `sacct` selects jobs by overlap.
+
+To troubleshoot, use `verbose: True` in the global settings of `config.yaml`, which reports the datasource, the row count per day, and the first few rows.
+
 ### Other Settings
 
 Partition names can be renamed:

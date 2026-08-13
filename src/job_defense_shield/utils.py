@@ -164,6 +164,8 @@ def read_config_file(config_file: Optional[str],
         cfg["jobstats-module-path"] = "/usr/local/jobstats/"
     if "jobstats-config-path" not in cfg:
         cfg["jobstats-config-path"] = "/etc/jobstats/"
+    if "use-druid" not in cfg:
+        cfg["use-druid"] = False
     if "email-method" not in cfg:
         cfg["email-method"] = "simple"
     if "email-domain-name" not in cfg:

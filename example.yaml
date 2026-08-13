@@ -20,6 +20,11 @@ report-emails:
   - admin2@institution.edu
 verbose: False
 show-empty-reports: True
+# Where to read the per-job summary statistics from. The default is Slurm's
+# AdminComment field. Uncomment at most one of these to override it; both take
+# their connection settings from the config.py in jobstats-config-path.
+# use-external-db: True
+# use-druid: True
 
 
 #################################################

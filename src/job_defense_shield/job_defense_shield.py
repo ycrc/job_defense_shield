@@ -16,6 +16,7 @@ from .workday import WorkdayFactory
 from .raw_job_data import SlurmSacct
 from .cleaner import SacctCleaner
 from .db_handler import ShieldDBHandler
+from .druid_handler import ShieldDruidHandler
 
 from .alert.cancel_zero_gpu_jobs import CancelZeroGpuJobs
 from .alert.gpu_model_too_powerful import GpuModelTooPowerful
@@ -264,7 +265,26 @@ def main():
             print(f"WARNING: {msg}")
     else:
         use_external_db = False
- 
+
+    if "use-druid" in cfg and cfg["use-druid"] and \
+       "jobstats-config-path" in cfg:
+        sys.path.insert(0, cfg["jobstats-config-path"])
+        # Only the connection settings are taken from DRUID_CONFIG. Its own
+        # "enabled" flag is deliberately ignored: that flag is derived from
+        # $CLUSTER to control the Jobstats CLI read-back, and $CLUSTER is not
+        # normally set in a cron environment, so consulting it here would
+        # silently disable this backend under cron while working interactively.
+        from config import DRUID_CONFIG
+        use_druid = True
+        print("INFO: Using Druid for summary statistics")
+    else:
+        use_druid = False
+
+    if use_druid and use_external_db:
+        print("ERROR: 'use-druid' and 'use-external-db' are mutually exclusive.")
+        print("       Choose one backend for the summary statistics.")
+        sys.exit()
+
     fields = ["jobid",
               "jobidraw",
               "user",
@@ -284,7 +304,7 @@ def main():
               "qos",
               "state",
               "jobname"]
-    if not use_external_db:
+    if not use_external_db and not use_druid:
         fields.insert(-1, "admincomment")
     # jobname must be last in list below to catch "|" characters in jobname
     assert fields[-1] == "jobname"
@@ -334,6 +354,24 @@ def main():
         df.jobidraw = df.jobidraw.astype("str")
         df = pd.merge(df,
                       df_ext,
+                      left_on=['jobidraw', 'cluster'],
+                      right_on=['jobid', 'cluster'],
+                      how="left")
+        df.drop(columns="jobid_y", inplace=True)
+        df.rename(columns={"admin_comment": "admincomment",
+                           "jobid_x": "jobid"}, inplace=True)
+
+    if use_druid:
+        drd = ShieldDruidHandler(DRUID_CONFIG,
+                                 args.clusters,
+                                 start_date,
+                                 end_date,
+                                 cfg["verbose"])
+        df_drd = drd.get_summary_stats()
+        df_drd.jobid = df_drd.jobid.astype("str")
+        df.jobidraw = df.jobidraw.astype("str")
+        df = pd.merge(df,
+                      df_drd,
                       left_on=['jobidraw', 'cluster'],
                       right_on=['jobid', 'cluster'],
                       how="left")
