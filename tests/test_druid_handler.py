@@ -152,3 +152,58 @@ def test_timestamps_are_sent_as_query_parameters(mocker):
     assert params[2]["value"] == "stellar"
     # the server-side deadline must be set, not just the client timeout
     assert payload["context"]["timeout"] == druid_handler.DEFAULT_BULK_TIMEOUT * 1000
+
+
+# --- gating: which runs actually fetch from Druid ---------------------------
+
+from argparse import Namespace
+
+from utils import needs_stored_stats
+
+
+def make_args(**flags):
+    """An argparse-like namespace with the non-flag options present too."""
+    base = {"days": 7, "clusters": "all", "partition": "", "config_file": None,
+            "starttime": None, "endtime": None,
+            "cancel_zero_gpu_jobs": False, "low_gpu_efficiency": False,
+            "zero_util_gpu_hours": False, "usage_overview": False,
+            "jobs_overview": False, "email": False, "dump_files": False}
+    base.update(flags)
+    return Namespace(**base)
+
+
+def test_cancellation_alert_does_not_fetch():
+    """It builds its own statistics from Prometheus for running jobs. This is
+       the case that matters: the cancellation cron fires every few minutes."""
+    assert not needs_stored_stats(make_args(cancel_zero_gpu_jobs=True))
+
+
+def test_sacct_only_reports_do_not_fetch():
+    assert not needs_stored_stats(make_args(usage_overview=True))
+    assert not needs_stored_stats(make_args(jobs_overview=True))
+
+
+def test_efficiency_alerts_fetch():
+    assert needs_stored_stats(make_args(low_gpu_efficiency=True))
+    assert needs_stored_stats(make_args(zero_util_gpu_hours=True))
+
+
+def test_mixed_run_fetches():
+    """A weekly run combining both kinds still needs the statistics."""
+    assert needs_stored_stats(make_args(usage_overview=True,
+                                        low_gpu_efficiency=True))
+
+
+def test_value_options_are_not_mistaken_for_flags():
+    """--days 7 and --clusters bouchet must not count as requested alerts."""
+    assert not needs_stored_stats(make_args(days=7, clusters="bouchet"))
+
+
+def test_email_modifiers_do_not_by_themselves_fetch():
+    assert not needs_stored_stats(make_args(cancel_zero_gpu_jobs=True,
+                                            email=True, dump_files=True))
+
+
+def test_unknown_future_alert_defaults_to_fetching():
+    """An alert added upstream must fetch rather than silently see no data."""
+    assert needs_stored_stats(make_args(some_new_alert=True))

@@ -428,3 +428,40 @@ def send_email_enhanced(email_body: str,
     msg.set_content(html, subtype="html")
     with smtplib.SMTP('localhost') as server:
         server.send_message(msg)
+
+
+# Flags that never read the per-job summary statistics of *completed* jobs.
+# Everything else is assumed to need them -- see needs_stored_stats().
+NO_STORED_STATS_NEEDED = {
+    # Builds its own statistics by querying Prometheus for jobs that are still
+    # running, and overwrites the admincomment column with the result.
+    "cancel_zero_gpu_jobs",
+    # Pure sacct aggregates.
+    "usage_overview",
+    "usage_by_slurm_account",
+    "longest_queued",
+    "jobs_overview",
+    # Modifiers rather than alerts.
+    "email",
+    "no_emails_to_users",
+    "no_emails_to_admins",
+    "report",
+    "check",
+    "dump_files",
+    "strict_start",
+}
+
+
+def needs_stored_stats(args) -> bool:
+    """Return True if any requested alert reads the stored summary statistics.
+
+    The test is deliberately inverted -- anything not named in
+    NO_STORED_STATS_NEEDED counts as needing the statistics. An alert added
+    later therefore fetches data it may not need, which is merely slow, rather
+    than silently seeing none, which looks exactly like a quiet week.
+
+    Only store_true flags are considered, since options carrying a value (an
+    int for --days, a string for --clusters) are never the singleton True.
+    """
+    return any(value is True and name not in NO_STORED_STATS_NEEDED
+               for name, value in vars(args).items())

@@ -11,6 +11,7 @@ from .utils import display_alerts
 from .utils import read_config_file
 from .utils import add_new_and_derived_fields
 from .utils import apply_strict_start
+from .utils import needs_stored_stats
 from .efficiency import get_stats_dict
 from .workday import WorkdayFactory
 from .raw_job_data import SlurmSacct
@@ -278,6 +279,18 @@ def main():
         use_druid = True
         print("INFO: Using Druid for summary statistics")
     else:
+        use_druid = False
+
+    # Fetching the stored statistics is a bulk scan, so it is skipped when
+    # nothing in this run would read them. Without this, a frequently-scheduled
+    # cancellation cron would pull a week of blobs it never looks at on every
+    # firing. Leaving use_druid False here also keeps admincomment in the sacct
+    # field list below, so the column still exists for alerts that fill it in
+    # themselves.
+    if use_druid and not needs_stored_stats(args):
+        if cfg["verbose"]:
+            msg = "no requested alert reads the stored summary statistics"
+            print(f"INFO: Skipping the Druid fetch ({msg})")
         use_druid = False
 
     if use_druid and use_external_db:
