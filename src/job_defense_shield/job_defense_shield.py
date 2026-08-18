@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime
 import pandas as pd
 
+from . import __version__
 from .utils import send_email
 from .utils import show_history_of_emails_sent
 from .utils import prepare_datetimes
@@ -112,7 +113,7 @@ def main():
                         help='Only include usage during the time window and not before')
     args = parser.parse_args()
 
-    head = "\nJob Defense Shield (1.3.1)\n"
+    head = f"\nJob Defense Shield ({__version__})\n"
     head += "github.com/PrincetonUniversity/job_defense_shield\n\n"
     fmt = "%a %b %-d, %Y at %-I:%M %p"
     head += f"INFO: {datetime.now().strftime(fmt)}\n"
