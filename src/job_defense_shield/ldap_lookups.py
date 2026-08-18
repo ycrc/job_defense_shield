@@ -59,12 +59,23 @@ def ldap_lookup(user: str,
 
     lines = output.stdout.split('\n')
     if attribute == "mail":
-        email = ""
         for line in lines:
+            # LDIF marks a base64-encoded value with a double colon. ldapsearch
+            # encodes any value it cannot write literally, and that includes a
+            # value with leading or trailing whitespace -- so a perfectly
+            # ordinary address can arrive encoded purely because of stray
+            # spacing in the directory. Matching only "mail: " misses those
+            # entries and yields an empty string, which the caller cannot tell
+            # apart from a user who genuinely has no address.
+            if line.startswith(f"{ldap_mail}:: "):
+                encoded = line[len(ldap_mail) + 3:].strip()
+                try:
+                    return b64decode(encoded).decode("utf-8").strip()
+                except Exception:
+                    return ""
             if line.startswith(f"{ldap_mail}: "):
-                email = line.replace(f"{ldap_mail}:", "").strip()
-                return email
-        return email
+                return line[len(ldap_mail) + 2:].strip()
+        return ""
     elif attribute == "name":
         trans_table = str.maketrans('', '', string.punctuation)
         for line in lines:
