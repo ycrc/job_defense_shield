@@ -290,12 +290,21 @@ class CancelZeroGpuJobs(Alert):
                         sys.path.append(self.jobstats_config_path)
                         from jobstats import Jobstats
                         from config import PROM_SERVER
-                        stats = Jobstats(jobid=jobid,
-                                         cluster=self.cluster,
-                                         prom_server=PROM_SERVER)
-                        stats.diff = window_seconds
-                        stats.end = time.time()
-                        stats.get_job_stats("gpu_utilization")
+                        # Jobstats calls sys.exit() when it finds no data for a job,
+                        # e.g. a runaway job that sacct still reports as RUNNING after
+                        # it has left Slurm. Treat such a job as not idle so that one
+                        # job cannot abort the entire run (and every cancellation).
+                        try:
+                            stats = Jobstats(jobid=jobid,
+                                             cluster=self.cluster,
+                                             prom_server=PROM_SERVER)
+                            stats.diff = window_seconds
+                            stats.end = time.time()
+                            stats.get_job_stats("gpu_utilization")
+                        except SystemExit:
+                            print(f"\nWARNING: Sliding Window: no job statistics for {jobid}; "
+                                  "treating it as not idle.", flush=True)
+                            return 0
                         admincomment = eval(stats.report_job_json(encode=False))
                         n, error_code = num_gpus_with_zero_util(admincomment,
                                                                 jobid,
